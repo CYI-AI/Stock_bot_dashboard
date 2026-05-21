@@ -16,7 +16,9 @@ import html
 import json
 import os
 import sys
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))  # 한국 표준시 — 클라우드 UTC 환경 대응
 from pathlib import Path
 
 import streamlit as st
@@ -303,6 +305,50 @@ def inject_global_css() -> None:
         border: none;
         border-top: 1px solid {THEME['border']};
         margin: 24px 0;
+    }}
+
+    /* ── 모바일 반응형 (≤640px) ─────────────────────────── */
+    @media (max-width: 640px) {{
+        .block-container {{
+            padding: 1rem 0.75rem !important;
+            max-width: 100% !important;
+        }}
+        .page-title {{ font-size: 22px !important; }}
+        .page-sub {{ font-size: 12px !important; margin-bottom: 16px; }}
+        .hero-value {{ font-size: 32px !important; letter-spacing: -0.5px; }}
+        .hero-label {{ font-size: 13px !important; }}
+        .hero-delta {{ font-size: 14px !important; }}
+        .kpi-value {{ font-size: 18px !important; }}
+        .kpi-label {{ font-size: 12px !important; }}
+        .kpi-sub {{ font-size: 11px !important; }}
+        .card {{ padding: 16px !important; border-radius: 12px !important; }}
+        .card-tight {{ padding: 12px 14px !important; border-radius: 10px !important; }}
+        .stock-card {{ padding: 14px !important; }}
+        .stock-name {{ font-size: 15px !important; }}
+        .stock-code {{ font-size: 10px !important; }}
+        .stock-sector {{ font-size: 10px !important; padding: 2px 8px !important; }}
+
+        /* 종목 카드 헤더 wrap 처리 */
+        .stock-card > div {{ flex-wrap: wrap; gap: 6px; }}
+
+        /* 탭 글자 작게 */
+        button[data-baseweb="tab"] {{ font-size: 13px !important; padding: 6px 10px !important; }}
+
+        /* st.container border wrapper 패딩 줄임 */
+        [data-testid="stVerticalBlockBorderWrapper"] {{
+            padding: 14px !important;
+            border-radius: 12px !important;
+        }}
+
+        /* dataframe 가로 스크롤 가능하게 */
+        .stDataFrame {{ overflow-x: auto; }}
+    }}
+
+    /* ── 태블릿 (641px ~ 900px) ─────────────────────────── */
+    @media (min-width: 641px) and (max-width: 900px) {{
+        .block-container {{ padding: 1.5rem 1rem !important; }}
+        .hero-value {{ font-size: 38px !important; }}
+        .kpi-value {{ font-size: 20px !important; }}
     }}
     </style>
     """
@@ -1012,7 +1058,10 @@ def page_decisions():
             stale_warning = ""
             try:
                 completed_dt = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-                age_days = (datetime.now() - completed_dt.replace(tzinfo=None)).days
+                # tz-aware로 통일 (없으면 KST로 가정 — 봇이 KST 환경)
+                if completed_dt.tzinfo is None:
+                    completed_dt = completed_dt.replace(tzinfo=KST)
+                age_days = (datetime.now(timezone.utc) - completed_dt).days
                 if age_days > 7:
                     stale_warning = f'<span class="badge badge-warning">⚠️ {age_days}일 전 데이터</span>'
             except Exception:
@@ -1058,7 +1107,10 @@ def page_decisions():
             stale_warning = ""
             try:
                 completed_dt = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-                age_days = (datetime.now() - completed_dt.replace(tzinfo=None)).days
+                # tz-aware로 통일 (없으면 KST로 가정 — 봇이 KST 환경)
+                if completed_dt.tzinfo is None:
+                    completed_dt = completed_dt.replace(tzinfo=KST)
+                age_days = (datetime.now(timezone.utc) - completed_dt).days
                 if age_days > 7:
                     stale_warning = f'<span class="badge badge-warning">⚠️ {age_days}일 전 데이터</span>'
             except Exception:
@@ -1118,17 +1170,20 @@ def main():
     page = st.sidebar.radio("페이지", list(PAGES.keys()), label_visibility="collapsed")
     st.sidebar.markdown("<hr/>", unsafe_allow_html=True)
 
-    # 갱신 정보 (디스크 스냅샷 시각)
+    # 갱신 정보 (디스크 스냅샷 시각) — timezone-aware 비교 (서버는 UTC, snapshot은 KST)
     refreshed = get_refresh_time()
     if refreshed:
         try:
-            dt = datetime.fromisoformat(refreshed.replace("Z", "+00:00")).replace(tzinfo=None)
-            age_min = int((datetime.now() - dt).total_seconds() / 60)
+            dt = datetime.fromisoformat(refreshed.replace("Z", "+00:00"))
+            now_utc = datetime.now(timezone.utc)
+            age_sec = max(0, int((now_utc - dt).total_seconds()))
+            age_min = age_sec // 60
             age_str = f"{age_min}분 전" if age_min < 60 else f"{age_min // 60}시간 {age_min % 60}분 전"
+            dt_kst = dt.astimezone(KST)  # 표시는 한국 시간으로
             st.sidebar.markdown(
                 f'<div style="color:{THEME["text_muted"]}; font-size:11px; margin-bottom:8px;">'
                 f'📡 마지막 갱신<br/>'
-                f'<b style="color:{THEME["text"]};">{dt:%H:%M:%S}</b> ({age_str})'
+                f'<b style="color:{THEME["text"]};">{dt_kst:%H:%M:%S} KST</b> ({age_str})'
                 f'</div>',
                 unsafe_allow_html=True,
             )
