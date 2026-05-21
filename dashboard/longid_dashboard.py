@@ -307,11 +307,52 @@ def inject_global_css() -> None:
         margin: 24px 0;
     }}
 
+    /* 가로 페이지 네비 (st.radio horizontal) — 큰 segmented control */
+    div[data-testid="stRadio"] > div[role="radiogroup"] {{
+        gap: 4px;
+        background: #f3f4f6;
+        padding: 4px;
+        border-radius: 12px;
+        display: inline-flex;
+    }}
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label {{
+        padding: 8px 16px;
+        border-radius: 8px;
+        margin: 0;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+        transition: background 0.15s;
+    }}
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {{
+        background: {THEME['card']};
+        color: {THEME['accent']};
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }}
+    /* 라디오 원 자체는 숨김 (탭처럼 보이게) */
+    div[data-testid="stRadio"] > div[role="radiogroup"] input[type="radio"] {{
+        display: none;
+    }}
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {{
+        display: none;
+    }}
+
     /* ── 모바일 반응형 (≤640px) ─────────────────────────── */
     @media (max-width: 640px) {{
         .block-container {{
             padding: 1rem 0.75rem !important;
             max-width: 100% !important;
+        }}
+        /* 가로 네비 모바일에서 가로 스크롤 */
+        div[data-testid="stRadio"] > div[role="radiogroup"] {{
+            display: flex;
+            width: 100%;
+        }}
+        div[data-testid="stRadio"] > div[role="radiogroup"] > label {{
+            flex: 1;
+            text-align: center;
+            padding: 8px 8px !important;
+            font-size: 13px !important;
         }}
         .page-title {{ font-size: 22px !important; }}
         .page-sub {{ font-size: 12px !important; margin-bottom: 16px; }}
@@ -546,11 +587,14 @@ def plot_return_pct(series: list) -> "go.Figure":
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Pretendard", color=THEME["text"], size=12),
-        xaxis=dict(showgrid=False, showline=False, ticks="", tickformat="%m/%d"),
+        # 모바일 터치로 의도치 않은 zoom/pan 방지
+        dragmode=False,
+        xaxis=dict(showgrid=False, showline=False, ticks="", tickformat="%m/%d", fixedrange=True),
         yaxis=dict(
             showgrid=True, gridcolor=THEME["border"], gridwidth=1,
             zeroline=False, ticks="",
             ticksuffix="%",
+            fixedrange=True,
         ),
         hovermode="x unified",
     )
@@ -558,7 +602,7 @@ def plot_return_pct(series: list) -> "go.Figure":
 
 
 def plot_portfolio_donut(positions: list) -> "go.Figure":
-    """포트폴리오 종목별 비중 도넛."""
+    """포트폴리오 종목별 비중 도넛 — 모바일 친화 (라벨 inside + legend)."""
     import plotly.graph_objects as go
 
     if not positions:
@@ -569,7 +613,6 @@ def plot_portfolio_donut(positions: list) -> "go.Figure":
     if sum(values) == 0:
         return go.Figure()
 
-    # 퍼플 그라데이션 톤
     palette = ["#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe",
                "#7c3aed", "#6d28d9", "#5b21b6"]
     colors = (palette * 10)[:len(labels)]
@@ -580,15 +623,23 @@ def plot_portfolio_donut(positions: list) -> "go.Figure":
         values=values,
         hole=0.65,
         marker=dict(colors=colors, line=dict(color="#ffffff", width=2)),
-        textposition="outside",
-        texttemplate="%{label}<br>%{percent}",
+        textposition="inside",                      # 라벨이 외곽 잘림 방지
+        texttemplate="%{percent}",                  # 도넛 안에는 비중%만
+        insidetextorientation="horizontal",
+        textfont=dict(size=12, color="#1a1a1a"),
         hovertemplate="<b>%{label}</b><br>%{value:,}원<br>%{percent}<extra></extra>",
     ))
     fig.update_layout(
-        height=320,
-        margin=dict(l=10, r=10, t=10, b=10),
+        height=340,
+        margin=dict(l=10, r=10, t=10, b=40),
         font=dict(family="Pretendard", size=12),
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=-0.15,
+            xanchor="center", x=0.5,
+            font=dict(size=11),
+        ),
         paper_bgcolor="rgba(0,0,0,0)",
     )
     return fig
@@ -749,7 +800,7 @@ def page_assets():
             </div>
             """, unsafe_allow_html=True)
             st.plotly_chart(plot_return_pct(return_series), use_container_width=True,
-                            config={"displayModeBar": False})
+                            config={"displayModeBar": False, "scrollZoom": False, "doubleClick": False, "showTips": False})
             st.caption("ℹ️ 일중 평가 변동은 일별 스냅샷에 반영 — 매매가 없던 날의 평가 변동은 마지막 점에서 합산되어 보입니다. 추가 입금/출금이 없었다고 가정.")
         else:
             st.info("아직 거래 이력 없음")
@@ -762,7 +813,7 @@ def page_assets():
             with st.container(border=True):
                 st.markdown('<div class="hero-label">포트폴리오 구성</div>', unsafe_allow_html=True)
                 st.plotly_chart(plot_portfolio_donut(positions), use_container_width=True,
-                                config={"displayModeBar": False})
+                                config={"displayModeBar": False, "scrollZoom": False, "doubleClick": False, "showTips": False})
 
         with c2:
             with st.container(border=True):
@@ -1160,18 +1211,9 @@ PAGES = {
 def main():
     inject_global_css()
 
-    # 사이드바
-    st.sidebar.markdown(
-        f'<div style="font-size:18px; font-weight:700; color:{THEME["accent"]}; margin-bottom:4px; line-height:1.3;">AI 한국주식<br/>포트폴리오</div>'
-        f'<div style="color:{THEME["text_muted"]}; font-size:12px; margin-bottom:24px;">가치 + 모멘텀 전략</div>',
-        unsafe_allow_html=True,
-    )
-
-    page = st.sidebar.radio("페이지", list(PAGES.keys()), label_visibility="collapsed")
-    st.sidebar.markdown("<hr/>", unsafe_allow_html=True)
-
-    # 갱신 정보 (디스크 스냅샷 시각) — timezone-aware 비교 (서버는 UTC, snapshot은 KST)
+    # ── 상단 브랜드 + 페이지 네비 (메인 영역) ─────────────────
     refreshed = get_refresh_time()
+    refresh_label = ""
     if refreshed:
         try:
             dt = datetime.fromisoformat(refreshed.replace("Z", "+00:00"))
@@ -1179,30 +1221,57 @@ def main():
             age_sec = max(0, int((now_utc - dt).total_seconds()))
             age_min = age_sec // 60
             age_str = f"{age_min}분 전" if age_min < 60 else f"{age_min // 60}시간 {age_min % 60}분 전"
-            dt_kst = dt.astimezone(KST)  # 표시는 한국 시간으로
-            st.sidebar.markdown(
-                f'<div style="color:{THEME["text_muted"]}; font-size:11px; margin-bottom:8px;">'
-                f'📡 마지막 갱신<br/>'
-                f'<b style="color:{THEME["text"]};">{dt_kst:%H:%M:%S} KST</b> ({age_str})'
-                f'</div>',
+            dt_kst = dt.astimezone(KST)
+            refresh_label = f"📡 {dt_kst:%H:%M:%S} KST · {age_str}"
+        except Exception:
+            refresh_label = f"📡 {refreshed[:19]}"
+
+    # 브랜드 + 갱신시각 (1줄, 모바일에서도 wrap)
+    st.markdown(f"""
+    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin:0 0 16px 0;">
+      <div style="font-size:18px; font-weight:700; color:{THEME['accent']};">
+        🤖 AI 한국주식 포트폴리오
+        <span style="color:{THEME['text_muted']}; font-size:12px; font-weight:500; margin-left:8px;">가치 + 모멘텀 전략</span>
+      </div>
+      <div style="color:{THEME['text_muted']}; font-size:12px;">{refresh_label}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── 가로 페이지 네비 (모바일에서도 잘 보이게) ──────────────
+    page = st.radio(
+        "페이지", list(PAGES.keys()),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="page_nav",
+    )
+
+    st.markdown('<div style="margin-bottom:24px;"></div>', unsafe_allow_html=True)
+
+    # 사이드바엔 부가 정보만 (안 봐도 OK)
+    with st.sidebar:
+        st.markdown(
+            f'<div style="font-size:16px; font-weight:700; color:{THEME["accent"]}; margin-bottom:16px;">AI 한국주식 포트폴리오</div>'
+            f'<div style="color:{THEME["text_muted"]}; font-size:12px; line-height:1.6; margin-bottom:24px;">'
+            f'가치 + 모멘텀 전략<br/>'
+            f'운영 시작: 2026-04-15<br/>'
+            f'정규장 종가 기준'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        if refresh_label:
+            st.markdown(
+                f'<div style="color:{THEME["text_muted"]}; font-size:11px; margin-bottom:12px;">{refresh_label}</div>',
                 unsafe_allow_html=True,
             )
-        except Exception:
-            st.sidebar.caption(f"갱신: {refreshed[:19]}")
-    else:
-        st.sidebar.warning("스냅샷 없음 — refresh 스크립트 첫 실행 대기")
-
-    if st.sidebar.button("🔄 캐시 비우기"):
-        st.cache_data.clear()
-        st.rerun()
-
-    st.sidebar.markdown(
-        f'<div style="color:{THEME["text_muted"]}; font-size:11px; margin-top:24px;">'
-        f'데이터는 10분마다 자동 갱신<br/>'
-        f'(refresh_dashboard_data.py · launchd)'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+        if st.button("🔄 캐시 비우기", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+        st.markdown(
+            f'<div style="color:{THEME["text_muted"]}; font-size:11px; margin-top:24px; line-height:1.5;">'
+            f'데이터 10분마다 자동 갱신'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     PAGES[page]()
 
