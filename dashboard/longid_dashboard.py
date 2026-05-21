@@ -314,6 +314,8 @@ def inject_global_css() -> None:
         padding: 4px;
         border-radius: 12px;
         display: inline-flex;
+        flex-wrap: nowrap;
+        max-width: 100%;
     }}
     div[data-testid="stRadio"] > div[role="radiogroup"] > label {{
         padding: 8px 16px;
@@ -322,6 +324,7 @@ def inject_global_css() -> None:
         cursor: pointer;
         font-weight: 600;
         font-size: 14px;
+        white-space: nowrap;
         transition: background 0.15s;
     }}
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {{
@@ -343,16 +346,25 @@ def inject_global_css() -> None:
             padding: 1rem 0.75rem !important;
             max-width: 100% !important;
         }}
-        /* 가로 네비 모바일에서 가로 스크롤 */
+        /* 가로 네비 모바일 — flex:1 제거하고 nowrap 유지 (한 줄에 안 들어가면 가로 스크롤) */
+        div[data-testid="stRadio"] {{
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }}
+        div[data-testid="stRadio"]::-webkit-scrollbar {{
+            display: none;
+        }}
         div[data-testid="stRadio"] > div[role="radiogroup"] {{
-            display: flex;
-            width: 100%;
+            display: inline-flex !important;
+            flex-wrap: nowrap !important;
+            width: max-content;
         }}
         div[data-testid="stRadio"] > div[role="radiogroup"] > label {{
-            flex: 1;
-            text-align: center;
-            padding: 8px 8px !important;
+            white-space: nowrap !important;
+            padding: 8px 12px !important;
             font-size: 13px !important;
+            flex: 0 0 auto !important;
         }}
         .page-title {{ font-size: 22px !important; }}
         .page-sub {{ font-size: 12px !important; margin-bottom: 16px; }}
@@ -629,16 +641,19 @@ def plot_portfolio_donut(positions: list) -> "go.Figure":
         textfont=dict(size=12, color="#1a1a1a"),
         hovertemplate="<b>%{label}</b><br>%{value:,}원<br>%{percent}<extra></extra>",
     ))
+    # 도넛 자체 + 별도 legend 영역 — 겹치지 않게 위아래 분리
     fig.update_layout(
-        height=340,
-        margin=dict(l=10, r=10, t=10, b=40),
+        height=420,
+        margin=dict(l=10, r=10, t=10, b=110),
         font=dict(family="Pretendard", size=12),
         showlegend=True,
         legend=dict(
             orientation="h",
-            yanchor="bottom", y=-0.15,
+            yanchor="top", y=-0.02,   # 도넛 바로 아래부터 시작
             xanchor="center", x=0.5,
             font=dict(size=11),
+            itemwidth=80,
+            traceorder="normal",
         ),
         paper_bgcolor="rgba(0,0,0,0)",
     )
